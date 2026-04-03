@@ -109,11 +109,11 @@ export function getPackageDir(): string {
  * - For tsx (src/): src/modes/interactive/theme/
  */
 export function getThemesDir(): string {
-	if (isBunBinary) {
+	const packageDir = getPackageDir();
+	if (isBunBinary && !process.env.PI_PACKAGE_DIR) {
 		return join(dirname(process.execPath), "theme");
 	}
 	// Theme is in modes/interactive/theme/ relative to src/ or dist/
-	const packageDir = getPackageDir();
 	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
 	return join(packageDir, srcOrDist, "modes", "interactive", "theme");
 }
@@ -125,10 +125,10 @@ export function getThemesDir(): string {
  * - For tsx (src/): src/core/export-html/
  */
 export function getExportTemplateDir(): string {
-	if (isBunBinary) {
+	const packageDir = getPackageDir();
+	if (isBunBinary && !process.env.PI_PACKAGE_DIR) {
 		return join(dirname(process.execPath), "export-html");
 	}
-	const packageDir = getPackageDir();
 	const srcOrDist = existsSync(join(packageDir, "src")) ? "src" : "dist";
 	return join(packageDir, srcOrDist, "core", "export-html");
 }
