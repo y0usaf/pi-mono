@@ -27,7 +27,7 @@
         npmBuildScript = "build:binary";
         npmDepsHash = "sha256-dzBmtAhm0X4TsKW9nwKVyhvYlMLphzNtKkDvubWQFPk=";
         nodejs = pkgs.nodejs_20;
-        nativeBuildInputs = [pkgs.bun pkgs.pkg-config];
+        nativeBuildInputs = [pkgs.bun pkgs.pkg-config pkgs.makeWrapper];
         buildInputs = [
           pkgs.cairo
           pkgs.giflib
@@ -38,7 +38,10 @@
         ];
         installPhase = ''
           runHook preInstall
+          mkdir -p $out/share/pi
+          cp -R packages/coding-agent/dist/. $out/share/pi/
           install -Dm755 packages/coding-agent/dist/pi $out/bin/pi
+          wrapProgram $out/bin/pi --set PI_PACKAGE_DIR $out/share/pi
           runHook postInstall
         '';
         meta = with lib; {
