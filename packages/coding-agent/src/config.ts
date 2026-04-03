@@ -110,6 +110,12 @@ export function getPackageDir(): string {
  */
 export function getThemesDir(): string {
 	const packageDir = getPackageDir();
+	if (existsSync(join(packageDir, "theme"))) {
+		return join(packageDir, "theme");
+	}
+	if (existsSync(join(packageDir, "dist", "theme"))) {
+		return join(packageDir, "dist", "theme");
+	}
 	if (isBunBinary && !process.env.PI_PACKAGE_DIR) {
 		return join(dirname(process.execPath), "theme");
 	}
@@ -126,6 +132,12 @@ export function getThemesDir(): string {
  */
 export function getExportTemplateDir(): string {
 	const packageDir = getPackageDir();
+	if (existsSync(join(packageDir, "export-html"))) {
+		return join(packageDir, "export-html");
+	}
+	if (existsSync(join(packageDir, "dist", "export-html"))) {
+		return join(packageDir, "dist", "export-html");
+	}
 	if (isBunBinary && !process.env.PI_PACKAGE_DIR) {
 		return join(dirname(process.execPath), "export-html");
 	}
