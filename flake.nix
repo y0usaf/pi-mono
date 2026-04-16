@@ -3,11 +3,31 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    piAgents.url = "path:./packages/pi-agents";
+    piAgents.inputs.nixpkgs.follows = "nixpkgs";
+
+    piCodexFastFlake.url = "path:./packages/pi-codex-fast-flake";
+    piCodexFastFlake.inputs.nixpkgs.follows = "nixpkgs";
+
+    piGeckoWebsearch.url = "path:./packages/pi-gecko-websearch";
+    piGeckoWebsearch.inputs.nixpkgs.follows = "nixpkgs";
+
+    piRtkFlake.url = "path:./packages/pi-rtk-flake";
+    piRtkFlake.inputs.nixpkgs.follows = "nixpkgs";
+
+    piWebfetch.url = "path:./packages/pi-webfetch";
+    piWebfetch.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
     self,
     nixpkgs,
+    piAgents,
+    piCodexFastFlake,
+    piGeckoWebsearch,
+    piRtkFlake,
+    piWebfetch,
     ...
   }: let
     systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
@@ -69,6 +89,12 @@
           mainProgram = "pi";
         };
       };
+
+      "pi-agents" = piAgents.packages.${system}.default;
+      "pi-codex-fast-flake" = piCodexFastFlake.packages.${system}.default;
+      "pi-gecko-websearch" = piGeckoWebsearch.packages.${system}.default;
+      "pi-rtk-flake" = piRtkFlake.packages.${system}.default;
+      "pi-webfetch" = piWebfetch.packages.${system}.default;
 
       default = self.packages.${system}.pi;
     });

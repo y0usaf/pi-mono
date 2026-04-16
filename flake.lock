@@ -16,9 +16,94 @@
         "type": "github"
       }
     },
+    "piAgents": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/pi-agents",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/pi-agents",
+        "type": "path"
+      },
+      "parent": []
+    },
+    "piCodexFastFlake": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/pi-codex-fast-flake",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/pi-codex-fast-flake",
+        "type": "path"
+      },
+      "parent": []
+    },
+    "piGeckoWebsearch": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/pi-gecko-websearch",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/pi-gecko-websearch",
+        "type": "path"
+      },
+      "parent": []
+    },
+    "piRtkFlake": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/pi-rtk-flake",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/pi-rtk-flake",
+        "type": "path"
+      },
+      "parent": []
+    },
+    "piWebfetch": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/pi-webfetch",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/pi-webfetch",
+        "type": "path"
+      },
+      "parent": []
+    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "piAgents": "piAgents",
+        "piCodexFastFlake": "piCodexFastFlake",
+        "piGeckoWebsearch": "piGeckoWebsearch",
+        "piRtkFlake": "piRtkFlake",
+        "piWebfetch": "piWebfetch"
       }
     }
   },
