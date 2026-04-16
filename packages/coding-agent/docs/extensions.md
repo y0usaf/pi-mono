@@ -1138,6 +1138,33 @@ When not streaming, the message is sent immediately and triggers a new turn. Whe
 
 See [send-user-message.ts](../examples/extensions/send-user-message.ts) for a complete example.
 
+### pi.continueFromTree(targetId, options?)
+
+Branch to a previous session-tree entry and continue from there without sending a new user message.
+
+```typescript
+const result = await pi.continueFromTree("entry-id-456", {
+  summarize: false,
+  label: "adversary-retry",
+});
+
+if (result.cancelled) {
+  // Tree navigation or summarization was cancelled
+}
+```
+
+Options match `ctx.navigateTree()`:
+- `summarize`
+- `customInstructions`
+- `replaceInstructions`
+- `label`
+
+Notes:
+- Unlike `ctx.navigateTree()`, this does not restore text to the editor
+- Retry from a user message reuses that existing user message instead of appending a duplicate
+- Retry from a tool-result message continues from that checkpoint without rerunning prior tool calls
+- Continuing from an assistant message is not supported and throws
+
 ### pi.appendEntry(customType, data?)
 
 Persist extension state (does NOT participate in LLM context).

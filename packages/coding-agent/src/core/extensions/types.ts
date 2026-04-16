@@ -1107,6 +1107,15 @@ export interface ExtensionAPI {
 		options?: { deliverAs?: "steer" | "followUp" },
 	): void;
 
+	/** Run a session control action with ExtensionCommandContext privileges. */
+	runSessionAction(action: (ctx: ExtensionCommandContext) => Promise<void>): Promise<void>;
+
+	/** Branch to a prior tree entry and continue from there without sending a new user message. */
+	continueFromTree(
+		targetId: string,
+		options?: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string },
+	): Promise<{ cancelled: boolean; aborted?: boolean; summaryEntry?: BranchSummaryEntry }>;
+
 	/** Append a custom entry to the session for state persistence (not sent to LLM). */
 	appendEntry<T = unknown>(customType: string, data?: T): void;
 
@@ -1326,6 +1335,13 @@ export type SendUserMessageHandler = (
 	options?: { deliverAs?: "steer" | "followUp" },
 ) => void;
 
+export type RunSessionActionHandler = (action: (ctx: ExtensionCommandContext) => Promise<void>) => Promise<void>;
+
+export type ContinueFromTreeHandler = (
+	targetId: string,
+	options?: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string },
+) => Promise<{ cancelled: boolean; aborted?: boolean; summaryEntry?: BranchSummaryEntry }>;
+
 export type AppendEntryHandler = <T = unknown>(customType: string, data?: T) => void;
 
 export type SetSessionNameHandler = (name: string) => void;
@@ -1380,6 +1396,8 @@ export interface ExtensionRuntimeState {
 export interface ExtensionActions {
 	sendMessage: SendMessageHandler;
 	sendUserMessage: SendUserMessageHandler;
+	runSessionAction: RunSessionActionHandler;
+	continueFromTree: ContinueFromTreeHandler;
 	appendEntry: AppendEntryHandler;
 	setSessionName: SetSessionNameHandler;
 	getSessionName: GetSessionNameHandler;

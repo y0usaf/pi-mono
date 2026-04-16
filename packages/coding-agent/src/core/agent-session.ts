@@ -1297,9 +1297,9 @@ export class AgentSession {
 			if (images.length === 0) images = undefined;
 		}
 
-		// Use prompt() with expandPromptTemplates: false to skip command handling and template expansion
+		// Route through prompt() so extension commands, skills, and prompt templates
+		// behave the same way they do for typed user input.
 		await this.prompt(text, {
-			expandPromptTemplates: false,
 			streamingBehavior: options?.deliverAs,
 			images,
 			source: "extension",
@@ -2148,6 +2148,15 @@ export class AgentSession {
 						});
 					});
 				},
+				continueFromTree: async (targetId, options) => {
+					return await this.continueFromTree(targetId, options);
+				},
+				runSessionAction: async (action) => {
+					if (!this._extensionCommandContextActions) {
+						throw new Error("Session actions are not available in this mode");
+					}
+					await action(runner.createCommandContext());
+				},
 				appendEntry: (customType, data) => {
 					this.sessionManager.appendCustomEntry(customType, data);
 				},
@@ -2632,25 +2641,16 @@ export class AgentSession {
 	// Tree Navigation
 	// =========================================================================
 
-	/**
-	 * Navigate to a different node in the session tree.
-	 * Unlike fork() which creates a new session file, this stays in the same file.
-	 *
-	 * @param targetId The entry ID to navigate to
-	 * @param options.summarize Whether user wants to summarize abandoned branch
-	 * @param options.customInstructions Custom instructions for summarizer
-	 * @param options.replaceInstructions If true, customInstructions replaces the default prompt
-	 * @param options.label Label to attach to the branch summary entry
-	 * @returns Result with editorText (if user message) and cancelled status
-	 */
-	async navigateTree(
+	private async _moveToTreeTarget(
 		targetId: string,
-		options: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string } = {},
+		options: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string },
+		mode: "navigate" | "continue",
 	): Promise<{ editorText?: string; cancelled: boolean; aborted?: boolean; summaryEntry?: BranchSummaryEntry }> {
 		const oldLeafId = this.sessionManager.getLeafId();
+		const isSameTarget = targetId === oldLeafId;
 
-		// No-op if already at target
-		if (targetId === oldLeafId) {
+		// No-op if already at target in navigation mode
+		if (mode === "navigate" && isSameTarget) {
 			return { cancelled: false };
 		}
 
@@ -2758,11 +2758,11 @@ export class AgentSession {
 		let newLeafId: string | null;
 		let editorText: string | undefined;
 
-		if (targetEntry.type === "message" && targetEntry.message.role === "user") {
+		if (mode === "navigate" && targetEntry.type === "message" && targetEntry.message.role === "user") {
 			// User message: leaf = parent (null if root), text goes to editor
 			newLeafId = targetEntry.parentId;
 			editorText = this._extractUserMessageText(targetEntry.message.content);
-		} else if (targetEntry.type === "custom_message") {
+		} else if (mode === "navigate" && targetEntry.type === "custom_message") {
 			// Custom message: leaf = parent (null if root), text goes to editor
 			newLeafId = targetEntry.parentId;
 			editorText =
@@ -2773,7 +2773,6 @@ export class AgentSession {
 							.map((c) => c.text)
 							.join("");
 		} else {
-			// Non-user message: leaf = selected node
 			newLeafId = targetId;
 		}
 
@@ -2789,12 +2788,14 @@ export class AgentSession {
 			if (label) {
 				this.sessionManager.appendLabelChange(summaryId, label);
 			}
-		} else if (newLeafId === null) {
-			// No summary, navigating to root - reset leaf
-			this.sessionManager.resetLeaf();
-		} else {
-			// No summary, navigating to non-root
-			this.sessionManager.branch(newLeafId);
+		} else if (!isSameTarget) {
+			if (newLeafId === null) {
+				// No summary, navigating to root - reset leaf
+				this.sessionManager.resetLeaf();
+			} else {
+				// No summary, navigating to non-root
+				this.sessionManager.branch(newLeafId);
+			}
 		}
 
 		// Attach label to target entry when not summarizing (no summary entry to label)
@@ -2817,10 +2818,60 @@ export class AgentSession {
 			});
 		}
 
-		// Emit to custom tools
-
 		this._branchSummaryAbortController = undefined;
 		return { editorText, cancelled: false, summaryEntry };
+	}
+
+	/**
+	 * Navigate to a different node in the session tree.
+	 * Unlike fork() which creates a new session file, this stays in the same file.
+	 *
+	 * @param targetId The entry ID to navigate to
+	 * @param options.summarize Whether user wants to summarize abandoned branch
+	 * @param options.customInstructions Custom instructions for summarizer
+	 * @param options.replaceInstructions If true, customInstructions replaces the default prompt
+	 * @param options.label Label to attach to the branch summary entry
+	 * @returns Result with editorText (if user message) and cancelled status
+	 */
+	async navigateTree(
+		targetId: string,
+		options: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string } = {},
+	): Promise<{ editorText?: string; cancelled: boolean; aborted?: boolean; summaryEntry?: BranchSummaryEntry }> {
+		return this._moveToTreeTarget(targetId, options, "navigate");
+	}
+
+	/**
+	 * Branch to a prior tree entry and continue from there without sending a new user message.
+	 */
+	async continueFromTree(
+		targetId: string,
+		options: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string } = {},
+	): Promise<{ cancelled: boolean; aborted?: boolean; summaryEntry?: BranchSummaryEntry }> {
+		if (this.isStreaming) {
+			throw new Error("Agent is already processing. Abort or wait for idle before continuing from tree.");
+		}
+
+		const result = await this._moveToTreeTarget(targetId, options, "continue");
+		if (result.cancelled) {
+			return { cancelled: true, aborted: result.aborted, summaryEntry: result.summaryEntry };
+		}
+
+		const lastMessage = this.agent.state.messages[this.agent.state.messages.length - 1];
+		if (!lastMessage) {
+			throw new Error("No messages to continue from selected tree entry");
+		}
+		if (lastMessage.role === "assistant") {
+			throw new Error("Cannot continue from an assistant message; choose a user or tool-result checkpoint");
+		}
+
+		await new Promise<void>((resolvePromise, rejectPromise) => {
+			setTimeout(() => {
+				this.agent.continue().then(resolvePromise).catch(rejectPromise);
+			}, 0);
+		});
+		await this.waitForRetry();
+
+		return { cancelled: false, aborted: result.aborted, summaryEntry: result.summaryEntry };
 	}
 
 	/**
