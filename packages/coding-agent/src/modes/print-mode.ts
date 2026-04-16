@@ -7,8 +7,9 @@
  */
 
 import type { AssistantMessage, ImageContent } from "@mariozechner/pi-ai";
-import type { AgentSessionRuntimeHost } from "../core/agent-session-runtime.js";
+import type { AgentSessionRuntime } from "../core/agent-session-runtime.js";
 import { flushRawStdout, writeRawStdout } from "../core/output-guard.js";
+import { killTrackedDetachedChildren } from "../utils/shell.js";
 
 /**
  * Options for print mode.
@@ -28,11 +29,40 @@ export interface PrintModeOptions {
  * Run in print (single-shot) mode.
  * Sends prompts to the agent and outputs the result.
  */
-export async function runPrintMode(runtimeHost: AgentSessionRuntimeHost, options: PrintModeOptions): Promise<number> {
+export async function runPrintMode(runtimeHost: AgentSessionRuntime, options: PrintModeOptions): Promise<number> {
 	const { mode, messages = [], initialMessage, initialImages } = options;
 	let exitCode = 0;
 	let session = runtimeHost.session;
 	let unsubscribe: (() => void) | undefined;
+	let disposed = false;
+	const signalCleanupHandlers: Array<() => void> = [];
+
+	const disposeRuntime = async (): Promise<void> => {
+		if (disposed) return;
+		disposed = true;
+		unsubscribe?.();
+		await runtimeHost.dispose();
+	};
+
+	const registerSignalHandlers = (): void => {
+		const signals: NodeJS.Signals[] = ["SIGTERM"];
+		if (process.platform !== "win32") {
+			signals.push("SIGHUP");
+		}
+
+		for (const signal of signals) {
+			const handler = () => {
+				killTrackedDetachedChildren();
+				void disposeRuntime().finally(() => {
+					process.exit(signal === "SIGHUP" ? 129 : 143);
+				});
+			};
+			process.on(signal, handler);
+			signalCleanupHandlers.push(() => process.off(signal, handler));
+		}
+	};
+
+	registerSignalHandlers();
 
 	const rebindSession = async (): Promise<void> => {
 		session = runtimeHost.session;
@@ -124,9 +154,14 @@ export async function runPrintMode(runtimeHost: AgentSessionRuntimeHost, options
 		}
 
 		return exitCode;
+	} catch (error: unknown) {
+		console.error(error instanceof Error ? error.message : String(error));
+		return 1;
 	} finally {
-		unsubscribe?.();
-		await runtimeHost.dispose();
+		for (const cleanup of signalCleanupHandlers) {
+			cleanup();
+		}
+		await disposeRuntime();
 		await flushRawStdout();
 	}
 }
